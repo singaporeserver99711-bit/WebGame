@@ -1,0 +1,39 @@
+{
+  "summary": "First iteration end-to-end testing of HyperArcade. Backend: 11/13 pytest tests passed. 2 backend bugs found related to player-name sanitisation — the Pydantic model rejects long / empty names with 422 instead of truncating or defaulting to 'Anon' as the spec requires. Frontend: all 4 games load, tab switching works, all HUD data-testids present, Matiks scoring behaviour verified (clicked subset summing to target -> score increased from 0 to 30), Reflex flow verified (wait -> ready -> ms result -> submit btn -> try-again modal), TryAgainModal fully functional (all buttons + input present), score submission to /api/leaderboard succeeded and leaderboard refresh showed the new player, personal-best-badge updated correctly, localStorage persistence confirmed after page reload. Mute/music toggles work and change labels between Muted/Sound and Loop/No Loop. Default state is Muted / No Loop as specified.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/leaderboard", "issue": "Player names >20 chars are REJECTED with 422 instead of being truncated to 20 chars. Root cause: `player: str = Field(min_length=1, max_length=20)` in ScoreCreate model. Spec requires server-side truncation (frontend already caps input, but backend should be tolerant). Fix: change to `player: str = Field(default='Anon', max_length=100)` (or remove max_length) and rely on the existing `payload.player.strip()[:20] or 'Anon'` logic in submit_score.", "priority": "HIGH"},
+      {"endpoint": "POST /api/leaderboard", "issue": "Empty player name ('') returns 422 due to `min_length=1`. Whitespace-only (e.g. '   ') works because Pydantic accepts non-empty strings then submit_score strips them, but truly empty strings fail. Spec requires defaulting empty/whitespace to 'Anon'. Fix: remove min_length constraint from ScoreCreate.player.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Canvas games (DontTouchRed / TowerBloxx)", "issues": ["Console warning: 'Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true.' Non-blocking but should add willReadFrequently:true when getting 2D context if getImageData is used."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_leaderboard.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Relax the Pydantic constraints on ScoreCreate.player: remove min_length=1 and max_length=20 (or raise it) so that empty and long names reach the existing server-side sanitisation logic which already truncates to 20 chars and defaults to 'Anon'. This will make the two failing backend contract tests pass."
+  ],
+  "critical_code_review_comments": [
+    "server.py: ScoreCreate uses `Field(min_length=1, max_length=20)` which contradicts the sanitisation logic on lines 55 (`.strip()[:20] or 'Anon'`). The Pydantic validators fire first, so the sanitisation code is unreachable for the empty/long cases the spec calls out. Either enforce the validators strictly (and update the spec) or loosen them and keep the sanitisation.",
+    "server.py: `@app.on_event('shutdown')` is deprecated in modern FastAPI; consider `lifespan` context manager.",
+    "Canvas contexts should be created with `{ willReadFrequently: true }` where getImageData is used repeatedly (see console warning)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_leaderboard.py (new)"
+  ],
+  "success_rate": {"backend": "85%", "frontend": "100%"},
+  "test_credentials": "N/A (no auth)",
+  "seed_data_creation": "Multiple TEST_-prefixed leaderboard rows created via test runs in `arcade_scores` MongoDB collection. Prefix cleanup not automated but rows are harmless.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend contract for player name sanitisation is not yet correct. After main agent loosens the Pydantic Field constraints on ScoreCreate.player, rerun `pytest /app/backend/tests/test_leaderboard.py -v`. All frontend flows already verified — no need to re-run frontend unless UI changes.",
+  "rca of the issue": "Pydantic v2 evaluates Field constraints (min_length/max_length) at deserialization time and raises RequestValidationError -> 422 before the route handler runs. The intended sanitisation on server.py:55 therefore never executes for empty or too-long inputs. Reproduce: `curl -X POST $BASE/api/leaderboard -H 'content-type: application/json' -d '{\"game\":\"matiks\",\"player\":\"\",\"score\":1}'` returns 422; same with a 40-char player. Mitigation: remove/loosen the Field constraints and let the handler's `player = payload.player.strip()[:20] or 'Anon'` do the work."
+}
