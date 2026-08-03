@@ -28,7 +28,7 @@ GameId = Literal["dontTouchRed", "towerBloxx", "matiks", "reflex"]
 
 class ScoreCreate(BaseModel):
     game: GameId
-    player: str = Field(min_length=1, max_length=20)
+    player: str = Field(default="Anon", max_length=100)
     score: float  # higher is better for all games (reflex uses inverted score)
     display: Optional[str] = None  # human-readable score e.g. "212 ms"
 
