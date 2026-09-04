@@ -1,4 +1,31 @@
 {
+    "services": {
+        "frontend": {
+            "root": "frontend",
+            "framework": "create-react-app"
+        },
+        "backend": {
+            "root": "backend"
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/api(/.*)?",
+            "destination": {
+                "type": "service",
+                "service": "backend"
+            }
+        },
+        {
+            "source": "/(.*)",
+            "destination": {
+                "type": "service",
+                "service": "frontend"
+            }
+        }
+    ]
+}
+{
   "version": 2,
   "builds": [
     {
@@ -13,4 +40,30 @@
     }
   ]
 }
-
+{
+    "services": {
+        "frontend": {
+            "root": "frontend",
+            "framework": "create-react-app"
+        },
+        "backend": {
+            "root": "backend"
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/api(/.*)?",
+            "destination": {
+                "type": "service",
+                "service": "backend"
+            }
+        },
+        {
+            "source": "/(.*)",
+            "destination": {
+                "type": "service",
+                "service": "frontend"
+            }
+        }
+    ]
+}
